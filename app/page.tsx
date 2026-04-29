@@ -230,6 +230,7 @@ export default function StampIt() {
               month={selectedMonth}
               today={today || new Date()}
               stamps={stamps}
+              setStamps={setStamps}
               onPunchComplete={handlePunchComplete}
               isPunching={isPunching}
               setTargetDay={setTargetDay}
@@ -272,6 +273,7 @@ function HomeView({
   month,
   today,
   stamps,
+  setStamps,
   onPunchComplete,
   isPunching,
   setTargetDay,
