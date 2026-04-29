@@ -1,5 +1,7 @@
 "use client";
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState, useRef, useEffect, useCallback } from "react";
+import Cropper from "react-easy-crop";
+import { Area, Point } from "react-easy-crop";
 
 const MONTHS = [
   "JAN",
@@ -220,6 +222,14 @@ function HomeView({
   const [currentDay, setCurrentDay] = useState<number>(today.getDate());
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // Crop modal state
+  const [cropModalOpen, setCropModalOpen] = useState(false);
+  const [imageToCrop, setImageToCrop] = useState<string | null>(null);
+  const [crop, setCrop] = useState<Point>({ x: 0, y: 0 });
+  const [zoom, setZoom] = useState(1);
+  const [croppedAreaPixels, setCroppedAreaPixels] = useState<Area | null>(null);
+  const [cropAnimation, setCropAnimation] = useState(false);
+
   // Check if a day is today
   const isToday = (day: number) => {
     return (
@@ -250,26 +260,85 @@ function HomeView({
     if (!stamps[day]) fileInputRef.current?.click();
   };
 
-  const handleUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
       const reader = new FileReader();
       reader.onload = (event) => {
         const result = event.target?.result as string;
-        const monthStr = (month + 1).toString().padStart(2, "0");
-        const dayName = getDayName(year, month, currentDay);
-        const timeStr = `${year.toString().slice(2)}.${monthStr}.${currentDay < 10 ? "0" + currentDay : currentDay}(${dayName}) 17:29`;
-        setStamps((prev) => ({
-          ...prev,
-          [currentDay]: {
-            img: result,
-            memo: "우표 내용 우표우표우표",
-            time: timeStr,
-          },
-        }));
+        setImageToCrop(result);
+        setCropModalOpen(true);
+        setCrop({ x: 0, y: 0 });
+        setZoom(1);
       };
       reader.readAsDataURL(file);
+      e.target.value = "";
     }
+  };
+
+  const onCropComplete = useCallback(
+    (croppedArea: Area, croppedAreaPixels: Area) => {
+      setCroppedAreaPixels(croppedAreaPixels);
+    },
+    [],
+  );
+
+  const createCroppedImage = useCallback(async () => {
+    if (!imageToCrop || !croppedAreaPixels) return;
+
+    const image = new Image();
+    image.src = imageToCrop;
+    await new Promise((resolve) => {
+      image.onload = resolve;
+    });
+
+    const canvas = document.createElement("canvas");
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+
+    canvas.width = 120;
+    canvas.height = 160;
+
+    ctx.drawImage(
+      image,
+      croppedAreaPixels.x,
+      croppedAreaPixels.y,
+      croppedAreaPixels.width,
+      croppedAreaPixels.height,
+      0,
+      0,
+      120,
+      160,
+    );
+
+    return canvas.toDataURL("image/jpeg", 0.9);
+  }, [imageToCrop, croppedAreaPixels]);
+
+  const handleCrop = async () => {
+    setCropAnimation(true);
+
+    // Wait for animation
+    await new Promise((resolve) => setTimeout(resolve, 500));
+
+    const croppedImage = await createCroppedImage();
+    if (croppedImage) {
+      const monthStr = (month + 1).toString().padStart(2, "0");
+      const dayName = getDayName(year, month, currentDay);
+      const timeStr = `${year.toString().slice(2)}.${monthStr}.${currentDay < 10 ? "0" + currentDay : currentDay}(${dayName}) 17:29`;
+
+      setStamps((prev) => ({
+        ...prev,
+        [currentDay]: {
+          img: croppedImage,
+          memo: "우표 내용 우표우표우표",
+          time: timeStr,
+        },
+      }));
+    }
+
+    setCropAnimation(false);
+    setCropModalOpen(false);
+    setImageToCrop(null);
   };
 
   /** [cite: 260, 267, 300, 389] 마스킹 스타일 공통 함수 */
@@ -290,7 +359,7 @@ function HomeView({
       <input
         type="file"
         ref={fileInputRef}
-        onChange={handleUpload}
+        onChange={handleFileSelect}
         className="hidden"
         accept="image/*"
       />
@@ -347,7 +416,7 @@ function HomeView({
 
       {/* [cite: 231, 248, 442, 446] 상세 정보 섹션 */}
       <div className="space-y-6 px-4">
-        <h2 className="text-[17px] font-bold underline underline-offset-[6px] decoration-gray-300 italic">
+        <h2 className="text-[17px] font-bold underline underline-offset-[6px] decoration-gray-300">
           오늘의 우표
         </h2>
 
@@ -372,7 +441,7 @@ function HomeView({
                 {stamps[currentDay]?.time ||
                   `${year.toString().slice(2)}.${(month + 1).toString().padStart(2, "0")}.${currentDay.toString().padStart(2, "0")}(${getDayName(year, month, currentDay)}) 17:29`}
               </p>
-              <p className="text-[14px] text-gray-700 italic">
+              <p className="text-[14px] text-gray-700">
                 {stamps[currentDay]?.memo || "우표 내용 우표우표우표 (0/30)"}
               </p>
             </div>
@@ -392,6 +461,37 @@ function HomeView({
           </div>
         </div>
       </div>
+
+      {/* Crop Modal */}
+      {cropModalOpen && imageToCrop && (
+        <CropModal
+          image={imageToCrop}
+          onClose={() => {
+            setCropModalOpen(false);
+            setImageToCrop(null);
+          }}
+          onCrop={() => {
+            // Get cropped image from sessionStorage
+            const croppedImage = sessionStorage.getItem("pendingCroppedImage");
+            if (croppedImage) {
+              const monthStr = (month + 1).toString().padStart(2, "0");
+              const dayName = getDayName(year, month, currentDay);
+              const timeStr = `${year.toString().slice(2)}.${monthStr}.${currentDay < 10 ? "0" + currentDay : currentDay}(${dayName}) 17:29`;
+              setStamps((prev) => ({
+                ...prev,
+                [currentDay]: {
+                  img: croppedImage,
+                  memo: "우표 내용 우표우표우표",
+                  time: timeStr,
+                },
+              }));
+              sessionStorage.removeItem("pendingCroppedImage");
+            }
+            setCropModalOpen(false);
+            setImageToCrop(null);
+          }}
+        />
+      )}
     </div>
   );
 }
@@ -399,14 +499,193 @@ function HomeView({
 function InboxView() {
   return (
     <div className="py-20 text-center text-gray-400 italic text-sm">
-      우편함 비어있음 📮
+      우편함 비어있음
     </div>
   );
 }
 function FriendsView() {
   return (
     <div className="py-20 text-center text-gray-400 italic text-sm">
-      친구 목록... 👥
+      친구 목록...
+    </div>
+  );
+}
+
+// Crop Modal Component
+function CropModal({
+  image,
+  onClose,
+  onCrop,
+}: {
+  image: string;
+  onClose: () => void;
+  onCrop: () => void;
+}) {
+  const [crop, setCrop] = useState<Point>({ x: 0, y: 0 });
+  const [zoom, setZoom] = useState(1);
+  const [croppedAreaPixels, setCroppedAreaPixels] = useState<Area | null>(null);
+  const [isAnimating, setIsAnimating] = useState(false);
+
+  const onCropComplete = useCallback((_: Area, croppedAreaPixels: Area) => {
+    setCroppedAreaPixels(croppedAreaPixels);
+  }, []);
+
+  const handleCrop = async () => {
+    if (!croppedAreaPixels) return;
+    setIsAnimating(true);
+    await new Promise((resolve) => setTimeout(resolve, 500)); // 감성 플래시 효과 [cite: 631]
+
+    const imageEl = new Image();
+    imageEl.src = image;
+    await new Promise((r) => {
+      imageEl.onload = r;
+    });
+
+    const canvas = document.createElement("canvas");
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+
+    // 우표 규격 3:4 비율 (120x160) [cite: 209, 586]
+    canvas.width = 1200;
+    canvas.height = 1600;
+
+    ctx.drawImage(
+      imageEl,
+      croppedAreaPixels.x,
+      croppedAreaPixels.y,
+      croppedAreaPixels.width,
+      croppedAreaPixels.height,
+      0,
+      0,
+      1200,
+      1600,
+    );
+
+    sessionStorage.setItem(
+      "pendingCroppedImage",
+      canvas.toDataURL("image/jpeg", 0.9),
+    );
+    setIsAnimating(false);
+    onCrop();
+  };
+
+  return (
+    <div className="fixed inset-0 z-[100] bg-black/95 flex flex-col items-center justify-center animate-in fade-in duration-300">
+      {isAnimating && (
+        <div className="absolute inset-0 bg-white z-[110] animate-flash" />
+      )}
+
+      {/* 상단 닫기 버튼 */}
+      <button
+        onClick={onClose}
+        className="absolute top-6 right-6 text-white text-2xl opacity-50 hover:opacity-100"
+      >
+        ✕
+      </button>
+
+      <div className="w-full max-w-[340px] px-4 space-y-8">
+        {/* 우표 가이드라인이 포함된 크롭 영역 */}
+        <div className="relative aspect-[3/4] w-full bg-neutral-900 shadow-2xl overflow-hidden rounded-sm">
+          <Cropper
+            image={image}
+            crop={crop}
+            zoom={zoom}
+            aspect={3 / 4}
+            onCropChange={setCrop}
+            onZoomChange={setZoom}
+            onCropComplete={onCropComplete}
+            showGrid={false}
+            classes={{
+              cropAreaClassName: "stamp-crop-area",
+            }}
+          />
+          {/* 실제 우표 모양 미리보기 가이드 [cite: 188] */}
+          <div
+            className="absolute inset-0 pointer-events-none border-[12px] border-black/40"
+            style={{
+              maskImage: STAMP_MASK,
+              WebkitMaskImage: STAMP_MASK,
+              maskSize: "100% 100%",
+              WebkitMaskSize: "100% 100%",
+            }}
+          ></div>
+        </div>
+
+        {/* 조작 UI - 빈티지한 느낌으로 강조 */}
+        <div className="bg-white/10 backdrop-blur-md p-6 rounded-2xl space-y-6">
+          <div className="flex items-center gap-4">
+            <span className="text-white/40 text-xs font-bold italic">ZOOM</span>
+            <input
+              type="range"
+              min={1}
+              max={3}
+              step={0.1}
+              value={zoom}
+              onChange={(e) => setZoom(Number(e.target.value))}
+              className="flex-1 h-1.5 bg-white/20 rounded-full appearance-none accent-white cursor-pointer"
+            />
+          </div>
+
+          <button
+            onClick={handleCrop}
+            disabled={isAnimating}
+            className="w-full py-4 bg-white text-black font-black text-sm tracking-widest rounded-xl hover:bg-neutral-200 transition-colors disabled:opacity-50"
+          >
+            {isAnimating ? "STAMPING..." : "우표 발행하기"}
+          </button>
+        </div>
+      </div>
+
+      <style jsx global>{`
+        @keyframes flash {
+          0% {
+            opacity: 0;
+          }
+          50% {
+            opacity: 1;
+          }
+          100% {
+            opacity: 0;
+          }
+        }
+        .animate-flash {
+          animation: flash 0.5s ease-out forwards;
+        }
+
+        /* react-easy-crop의 기본 하이라이트 박스를 우리 우표 모양으로 바꿉니다 */
+        .stamp-crop-area {
+          border: none !important;
+          outline: none !important;
+
+          /* 톱니 모양 마스크 직접 적용 */
+          mask-image: ${STAMP_MASK};
+          -webkit-mask-image: ${STAMP_MASK};
+          mask-size: 100% 100%;
+          -webkit-mask-size: 100% 100%;
+          mask-repeat: no-repeat;
+          -webkit-mask-repeat: no-repeat;
+
+          /* 안쪽을 비워주기 위한 설정 */
+          background: transparent !important;
+
+          /* 바깥 그림자 */
+          box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.7) !important;
+          background: transparent !important;
+        }
+
+        /* 크롭 영역의 테두리를 강조하고 싶다면 */
+        .stamp-crop-area::after {
+          content: "";
+          position: absolute;
+          inset: 0;
+          border: 2px solid white;
+          mask-image: ${STAMP_MASK};
+          -webkit-mask-image: ${STAMP_MASK};
+          mask-size: 100% 100%;
+          -webkit-mask-size: 100% 100%;
+          pointer-events: none;
+        }
+      `}</style>
     </div>
   );
 }
