@@ -412,11 +412,11 @@ function HomeView({
         })}
       </div>
 
-      <div className="border-t border-dashed border-gray-300 my-8"></div>
+      <div className="border-t border-dashed border-gray-700 my-8"></div>
 
       {/* [cite: 231, 248, 442, 446] 상세 정보 섹션 */}
       <div className="space-y-6 px-4">
-        <h2 className="text-[17px] font-bold underline underline-offset-[6px] decoration-gray-300">
+        <h2 className="text-[17px] font-anemone underline underline-offset-[6px] decoration-gray-600">
           오늘의 우표
         </h2>
 
@@ -429,31 +429,33 @@ function HomeView({
             }
           >
             {!stamps[currentDay] && (
-              <div className="w-full h-full flex items-center justify-center text-[10px] text-gray-400 italic">
-                Select a date
+              <div className="w-full h-full flex items-center justify-center text-[10px] text-gray-400 font-anemone text-center px-2">
+                아직 발행된
+                <br />
+                우표가 없어요
               </div>
             )}
           </div>
 
           <div className="flex-1 flex flex-col justify-between min-h-[160px] py-1">
             <div className="space-y-3">
-              <p className="text-[13px] font-bold text-gray-500">
+              <p className="text-[13px] font-anemone text-gray-700">
                 {stamps[currentDay]?.time ||
                   `${year.toString().slice(2)}.${(month + 1).toString().padStart(2, "0")}.${currentDay.toString().padStart(2, "0")}(${getDayName(year, month, currentDay)}) 17:29`}
               </p>
-              <p className="text-[14px] text-gray-700">
-                {stamps[currentDay]?.memo || "우표 내용 우표우표우표 (0/30)"}
+              <p className="text-[14px] text-gray-700 font-anemone">
+                {stamps[currentDay]?.memo || "우표 내용 우표우표우표"}
               </p>
             </div>
 
             {/* [cite: 234, 447] 액션 링크 */}
             <div className="flex gap-5 mt-auto">
-              <button className="text-[13px] font-bold underline underline-offset-4 decoration-gray-300">
+              <button className="text-[13px] font-anemone underline underline-offset-4 decoration-gray-600">
                 친구에게 보내기
               </button>
               <button
                 onClick={() => fileInputRef.current?.click()}
-                className="text-[13px] font-bold underline underline-offset-4 decoration-gray-300"
+                className="text-[13px] font-anemone underline underline-offset-4 decoration-gray-600"
               >
                 재발행하기
               </button>
@@ -574,7 +576,6 @@ function CropModal({
       {isAnimating && (
         <div className="absolute inset-0 bg-white z-[110] animate-flash" />
       )}
-
       {/* 상단 닫기 버튼 */}
       <button
         onClick={onClose}
@@ -582,7 +583,6 @@ function CropModal({
       >
         ✕
       </button>
-
       <div className="w-full max-w-[340px] px-4 space-y-8">
         {/* 우표 가이드라인이 포함된 크롭 영역 */}
         <div className="relative aspect-[3/4] w-full bg-neutral-900 shadow-2xl overflow-hidden rounded-sm">
@@ -635,57 +635,6 @@ function CropModal({
           </button>
         </div>
       </div>
-
-      <style jsx global>{`
-        @keyframes flash {
-          0% {
-            opacity: 0;
-          }
-          50% {
-            opacity: 1;
-          }
-          100% {
-            opacity: 0;
-          }
-        }
-        .animate-flash {
-          animation: flash 0.5s ease-out forwards;
-        }
-
-        /* react-easy-crop의 기본 하이라이트 박스를 우리 우표 모양으로 바꿉니다 */
-        .stamp-crop-area {
-          border: none !important;
-          outline: none !important;
-
-          /* 톱니 모양 마스크 직접 적용 */
-          mask-image: ${STAMP_MASK};
-          -webkit-mask-image: ${STAMP_MASK};
-          mask-size: 100% 100%;
-          -webkit-mask-size: 100% 100%;
-          mask-repeat: no-repeat;
-          -webkit-mask-repeat: no-repeat;
-
-          /* 안쪽을 비워주기 위한 설정 */
-          background: transparent !important;
-
-          /* 바깥 그림자 */
-          box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.7) !important;
-          background: transparent !important;
-        }
-
-        /* 크롭 영역의 테두리를 강조하고 싶다면 */
-        .stamp-crop-area::after {
-          content: "";
-          position: absolute;
-          inset: 0;
-          border: 2px solid white;
-          mask-image: ${STAMP_MASK};
-          -webkit-mask-image: ${STAMP_MASK};
-          mask-size: 100% 100%;
-          -webkit-mask-size: 100% 100%;
-          pointer-events: none;
-        }
-      `}</style>
     </div>
   );
 }
