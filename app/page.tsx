@@ -26,10 +26,24 @@ const STAMP_MASK = `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000
 
 export default function StampIt() {
   const [activeTab, setActiveTab] = useState("home");
+  const [today, setToday] = useState<Date | null>(null);
   const [selectedYear, setSelectedYear] = useState(2026);
-  const [selectedMonth, setSelectedMonth] = useState(3); // 0-indexed (3 = APR)
+  const [selectedMonth, setSelectedMonth] = useState(3);
   const [showDial, setShowDial] = useState(false);
   const dialRef = useRef<HTMLDivElement>(null);
+
+  // Initialize today on client side
+  useEffect(() => {
+    const now = new Date();
+    setToday(now);
+    setSelectedYear(now.getFullYear());
+    setSelectedMonth(now.getMonth());
+  }, []);
+
+  const isToday =
+    today &&
+    selectedYear === today.getFullYear() &&
+    selectedMonth === today.getMonth();
 
   // Dial outside click close
   useEffect(() => {
@@ -53,6 +67,13 @@ export default function StampIt() {
     });
   };
 
+  const goToToday = () => {
+    if (today) {
+      setSelectedYear(today.getFullYear());
+      setSelectedMonth(today.getMonth());
+    }
+  };
+
   return (
     <div className="min-h-screen bg-[#fdfcf0] text-[#333] font-sans selection:bg-pink-100 flex justify-center overflow-x-hidden">
       {/* [cite: 176, 220, 451, 454] 빈티지 그리드 배경 */}
@@ -65,7 +86,7 @@ export default function StampIt() {
         }}
       ></div>
 
-      <div className="w-[375px] relative pt-12 pb-24 flex flex-col min-h-screen z-10">
+      <div className="w-[375px] relative pt-8 pb-24 flex flex-col min-h-screen z-10">
         <header className="flex justify-between items-end mb-8">
           <div className="relative">
             {/* APR + Year selector */}
@@ -76,9 +97,19 @@ export default function StampIt() {
               >
                 {MONTHS[selectedMonth]}
               </button>
-              <span className="text-xs text-gray-400 font-medium mb-1">
-                {selectedYear}
-              </span>
+              <div className="flex flex-col items-start">
+                <span className="text-xs text-gray-400 font-medium mb-1">
+                  {selectedYear}
+                </span>
+                {!isToday && (
+                  <button
+                    onClick={goToToday}
+                    className="text-[10px] text-gray-400 hover:text-black underline"
+                  >
+                    today
+                  </button>
+                )}
+              </div>
             </div>
 
             {/* Dial Picker */}
@@ -136,7 +167,11 @@ export default function StampIt() {
 
         <main className="flex-1">
           {activeTab === "home" && (
-            <HomeView year={selectedYear} month={selectedMonth} />
+            <HomeView
+              year={selectedYear}
+              month={selectedMonth}
+              today={today || new Date()}
+            />
           )}
           {activeTab === "inbox" && <InboxView />}
           {activeTab === "friends" && <FriendsView />}
@@ -170,12 +205,29 @@ export default function StampIt() {
   );
 }
 
-function HomeView({ year, month }: { year: number; month: number }) {
+function HomeView({
+  year,
+  month,
+  today,
+}: {
+  year: number;
+  month: number;
+  today: Date;
+}) {
   const [stamps, setStamps] = useState<
     Record<number, { img: string; memo: string; time: string }>
   >({});
-  const [currentDay, setCurrentDay] = useState<number>(29);
+  const [currentDay, setCurrentDay] = useState<number>(today.getDate());
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Check if a day is today
+  const isToday = (day: number) => {
+    return (
+      year === today.getFullYear() &&
+      month === today.getMonth() &&
+      day === today.getDate()
+    );
+  };
 
   // Get days in month
   const getDaysInMonth = (y: number, m: number) => {
@@ -269,9 +321,15 @@ function HomeView({ year, month }: { year: number; month: number }) {
                     className="w-full h-full bg-cover bg-center shadow-sm"
                     style={stampMaskStyle(stamp.img)}
                   ></div>
-                  <span className="absolute z-10 text-[10px] bg-black text-white rounded-full w-[18px] h-[18px] flex items-center justify-center font-bold top-[-8px] border border-white">
+                  <span
+                    className={`absolute z-10 text-[10px] rounded-full w-[18px] h-[18px] flex items-center justify-center font-bold top-[-8px] border border-white ${isToday(day) ? "bg-black text-white" : "bg-black text-white"}`}
+                  >
                     {day}
                   </span>
+                </div>
+              ) : isToday(day) ? (
+                <div className="w-7 h-7 bg-black rounded-full flex items-center justify-center">
+                  <span className="text-sm font-bold text-white">{day}</span>
                 </div>
               ) : (
                 <span
