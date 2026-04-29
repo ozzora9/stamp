@@ -92,7 +92,7 @@ function PostcardWriteContent() {
         {/* 1. Header: Month 크기의 POST + 아래 send to */}
         <header className="mb-8 px-4 flex flex-col items-start">
           <h1 className="text-4xl font-black tracking-tighter leading-none mb-2">
-            POST
+            SEND
           </h1>
         </header>
 

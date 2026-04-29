@@ -219,8 +219,8 @@ export default function StampIt() {
             )}
           </div>
           <button onClick={() => router.push("/inbox")} className="relative">
-            <span className="text-2xl">✉️</span>
-            <div className="absolute -top-0.5 -right-0.5 w-2 h-2 bg-red-500 rounded-full border border-white"></div>
+            <span className="text-[13px]">send →</span>
+            {/* <div className="absolute -top-0.5 -right-0.5 w-2 h-2 bg-red-500 rounded-full border border-white"></div> */}
           </button>
         </header>
 
@@ -244,24 +244,24 @@ export default function StampIt() {
         <nav className="fixed bottom-0 w-[375px] bg-[#fdfcf0]/90 backdrop-blur-sm border-t border-dashed border-gray-300 py-4 px-8 flex justify-between items-center z-20">
           <button
             onClick={() => setActiveTab("home")}
-            className={`text-xl ${activeTab === "home" ? "opacity-100" : "opacity-30"}`}
+            className={`text-[13px] ${activeTab === "home" ? "opacity-100" : "opacity-30"}`}
           >
-            🏠
+            home
           </button>
           <button
             onClick={() => router.push("/inbox")}
-            className={`text-xl ${activeTab === "inbox" ? "opacity-100" : "opacity-30"}`}
+            className={`text-[13px] ${activeTab === "inbox" ? "opacity-100" : "opacity-30"}`}
           >
-            📮
+            inbox
           </button>
           <button
             onClick={() => router.push("/")}
-            className={`text-xl ${activeTab === "friends" ? "opacity-100" : "opacity-30"}`}
+            className={`text-[13px] ${activeTab === "friends" ? "opacity-100" : "opacity-30"}`}
           >
-            👥
+            friends
           </button>
-          <button className="opacity-30 text-xl grayscale cursor-not-allowed">
-            ⚙️
+          <button className="opacity-30 text-[13px] grayscale cursor-not-allowed">
+            setting
           </button>
         </nav>
       </div>
