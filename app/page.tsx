@@ -289,8 +289,7 @@ function HomeView({
 
   const isToday = (day: number) => {
     return (
-      year === today.getFullYear() &&
-      month === today.getMonth() &&
+      (year === today.getFullYear()) & (month === today.getMonth()) &&
       day === today.getDate()
     );
   };
@@ -423,7 +422,7 @@ function HomeView({
             <div className="space-y-3">
               <p className="text-[13px] font-anemone text-gray-700">
                 {stamps[`${year}-${month}-${currentDay}`]?.time ||
-                  `${year.toString().slice(2)}.${(month + 1).toString().padStart(2, "0")}.${currentDay.toString().padStart(2, "0")}(${getDayName(year, month, currentDay)}) 17:29`}
+                  `${year.toString().slice(2)}.${(month + 1).toString().padStart(2, "0")}.${currentDay.toString().padStart(2, "0")}(${getDayName(year, month, currentDay)})`}
               </p>
               <p className="text-[14px] text-gray-700 font-anemone">
                 {stamps[`${year}-${month}-${currentDay}`]?.memo ||
