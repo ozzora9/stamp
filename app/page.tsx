@@ -84,11 +84,12 @@ function HomeView() {
     if (file) {
       const reader = new FileReader();
       reader.onload = (event) => {
+        const result = event.target?.result as string;
         const timeStr = `26.04.${currentDay < 10 ? "0" + currentDay : currentDay}(Wed) 17:29`;
         setStamps((prev) => ({
           ...prev,
           [currentDay]: {
-            img: event.target.result as string,
+            img: result,
             memo: "우표 내용 우표우표우표",
             time: timeStr,
           },
