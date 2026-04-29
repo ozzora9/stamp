@@ -30,6 +30,30 @@ function PostcardWriteContent() {
     fetchAllStamps();
   }, []);
 
+  const handleSendPostcard = async () => {
+    if (!selectedStamp || !message.trim()) {
+      alert("우표를 붙이고 마음을 적어주세요! 📮");
+      return;
+    }
+
+    const { error } = await supabase.from("postcards").insert([
+      {
+        sender_name: senderName,
+        receiver_name: receiverName,
+        message: message,
+        stamp_url: selectedStamp.image_url,
+      },
+    ]);
+
+    if (error) {
+      console.error("전송 에러:", error);
+      alert("우편 배달 사고가 났어요. 다시 시도해 주세요!");
+    } else {
+      alert("엽서가 우체통에 쏙 들어갔습니다! ✨");
+      router.push("/inbox"); // 전송 후 바로 수신함으로 이동해서 확인!
+    }
+  };
+
   const fetchAllStamps = async () => {
     const { data } = await supabase
       .from("stamps")
@@ -153,7 +177,10 @@ function PostcardWriteContent() {
               우표 고르기
             </h2>
             {/* 발송 버튼 */}
-            <button className="text-sm active:scale-95 transition-all">
+            <button
+              onClick={handleSendPostcard}
+              className="text-sm active:scale-95 transition-all"
+            >
               전송하기
             </button>
           </div>

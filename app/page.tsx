@@ -29,6 +29,7 @@ export default function StampIt() {
   const [selectedMonth, setSelectedMonth] = useState(3);
   const [showDial, setShowDial] = useState(false);
   const dialRef = useRef<HTMLDivElement>(null);
+  const router = useRouter();
 
   // 데이터 상태 관리 (부모에서 통합 관리)
   const [stamps, setStamps] = useState<
@@ -217,7 +218,7 @@ export default function StampIt() {
               </div>
             )}
           </div>
-          <button onClick={() => setActiveTab("inbox")} className="relative">
+          <button onClick={() => router.push("/inbox")} className="relative">
             <span className="text-2xl">✉️</span>
             <div className="absolute -top-0.5 -right-0.5 w-2 h-2 bg-red-500 rounded-full border border-white"></div>
           </button>
@@ -248,13 +249,13 @@ export default function StampIt() {
             🏠
           </button>
           <button
-            onClick={() => setActiveTab("inbox")}
+            onClick={() => router.push("/inbox")}
             className={`text-xl ${activeTab === "inbox" ? "opacity-100" : "opacity-30"}`}
           >
             📮
           </button>
           <button
-            onClick={() => setActiveTab("friends")}
+            onClick={() => router.push("/")}
             className={`text-xl ${activeTab === "friends" ? "opacity-100" : "opacity-30"}`}
           >
             👥
