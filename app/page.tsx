@@ -1,5 +1,20 @@
 "use client";
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, useEffect } from "react";
+
+const MONTHS = [
+  "JAN",
+  "FEB",
+  "MAR",
+  "APR",
+  "MAY",
+  "JUN",
+  "JUL",
+  "AUG",
+  "SEP",
+  "OCT",
+  "NOV",
+  "DEC",
+];
 
 /**
  * [cite: 95, 215] 우표 톱니 마스크 스타일 수정
@@ -10,7 +25,33 @@ import React, { useState, useRef } from "react";
 const STAMP_MASK = `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='160' viewBox='0 0 120 160'%3E%3Cmask id='m'%3E%3Crect width='120' height='160' fill='white'/%3E%3Ccircle cx='0' cy='0' r='6' fill='black'/%3E%3Ccircle cx='20' cy='0' r='6' fill='black'/%3E%3Ccircle cx='40' cy='0' r='6' fill='black'/%3E%3Ccircle cx='60' cy='0' r='6' fill='black'/%3E%3Ccircle cx='80' cy='0' r='6' fill='black'/%3E%3Ccircle cx='100' cy='0' r='6' fill='black'/%3E%3Ccircle cx='120' cy='0' r='6' fill='black'/%3E%3Ccircle cx='0' cy='160' r='6' fill='black'/%3E%3Ccircle cx='20' cy='160' r='6' fill='black'/%3E%3Ccircle cx='40' cy='160' r='6' fill='black'/%3E%3Ccircle cx='60' cy='160' r='6' fill='black'/%3E%3Ccircle cx='80' cy='160' r='6' fill='black'/%3E%3Ccircle cx='100' cy='160' r='6' fill='black'/%3E%3Ccircle cx='120' cy='160' r='6' fill='black'/%3E%3Ccircle cx='0' cy='20' r='6' fill='black'/%3E%3Ccircle cx='0' cy='40' r='6' fill='black'/%3E%3Ccircle cx='0' cy='60' r='6' fill='black'/%3E%3Ccircle cx='0' cy='80' r='6' fill='black'/%3E%3Ccircle cx='0' cy='100' r='6' fill='black'/%3E%3Ccircle cx='0' cy='120' r='6' fill='black'/%3E%3Ccircle cx='0' cy='140' r='6' fill='black'/%3E%3Ccircle cx='120' cy='20' r='6' fill='black'/%3E%3Ccircle cx='120' cy='40' r='6' fill='black'/%3E%3Ccircle cx='120' cy='60' r='6' fill='black'/%3E%3Ccircle cx='120' cy='80' r='6' fill='black'/%3E%3Ccircle cx='120' cy='100' r='6' fill='black'/%3E%3Ccircle cx='120' cy='120' r='6' fill='black'/%3E%3Ccircle cx='120' cy='140' r='6' fill='black'/%3E%3C/mask%3E%3Crect width='120' height='160' fill='white' mask='url(%23m)'/%3E%3C/svg%3E")`;
 
 export default function StampIt() {
-  const [activeTab, setActiveTab] = useState("home"); // [cite: 352]
+  const [activeTab, setActiveTab] = useState("home");
+  const [selectedYear, setSelectedYear] = useState(2026);
+  const [selectedMonth, setSelectedMonth] = useState(3); // 0-indexed (3 = APR)
+  const [showDial, setShowDial] = useState(false);
+  const dialRef = useRef<HTMLDivElement>(null);
+
+  // Dial outside click close
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (dialRef.current && !dialRef.current.contains(e.target as Node)) {
+        setShowDial(false);
+      }
+    };
+    if (showDial) document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [showDial]);
+
+  const handleYearChange = (delta: number) => {
+    setSelectedYear((prev) => Math.max(2020, Math.min(2030, prev + delta)));
+  };
+
+  const handleMonthChange = (delta: number) => {
+    setSelectedMonth((prev) => {
+      const newMonth = (prev + delta + 12) % 12;
+      return newMonth;
+    });
+  };
 
   return (
     <div className="min-h-screen bg-[#fdfcf0] text-[#333] font-sans selection:bg-pink-100 flex justify-center overflow-x-hidden">
@@ -26,7 +67,67 @@ export default function StampIt() {
 
       <div className="w-[375px] relative pt-12 pb-24 flex flex-col min-h-screen z-10">
         <header className="flex justify-between items-end mb-8">
-          <h1 className="text-4xl font-black tracking-tighter">APR</h1>
+          <div className="relative">
+            {/* APR + Year selector */}
+            <div className="flex items-end gap-2">
+              <button
+                onClick={() => setShowDial(!showDial)}
+                className="text-4xl font-black tracking-tighter hover:opacity-70 transition-opacity"
+              >
+                {MONTHS[selectedMonth]}
+              </button>
+              <span className="text-xs text-gray-400 font-medium mb-1">
+                {selectedYear}
+              </span>
+            </div>
+
+            {/* Dial Picker */}
+            {showDial && (
+              <div
+                ref={dialRef}
+                className="absolute top-full left-0 mt-2 bg-white border-2 border-black shadow-xl z-50 p-4 rounded-lg"
+              >
+                {/* Year Dial */}
+                <div className="flex items-center gap-3 mb-4">
+                  <button
+                    onClick={() => handleYearChange(-1)}
+                    className="w-8 h-8 bg-gray-100 hover:bg-gray-200 rounded-full font-bold text-lg"
+                  >
+                    ‹
+                  </button>
+                  <div className="w-16 text-center font-bold text-lg">
+                    {selectedYear}
+                  </div>
+                  <button
+                    onClick={() => handleYearChange(1)}
+                    className="w-8 h-8 bg-gray-100 hover:bg-gray-200 rounded-full font-bold text-lg"
+                  >
+                    ›
+                  </button>
+                </div>
+
+                {/* Month Dial */}
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => handleMonthChange(-1)}
+                    className="w-8 h-8 bg-gray-100 hover:bg-gray-200 rounded-full font-bold"
+                  >
+                    ‹
+                  </button>
+                  <div className="w-20 text-center font-black text-xl">
+                    {MONTHS[selectedMonth]}
+                  </div>
+                  <button
+                    onClick={() => handleMonthChange(1)}
+                    className="w-8 h-8 bg-gray-100 hover:bg-gray-200 rounded-full font-bold"
+                  >
+                    ›
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+
           <button onClick={() => setActiveTab("inbox")} className="relative">
             <span className="text-2xl">✉️</span>
             <div className="absolute -top-0.5 -right-0.5 w-2 h-2 bg-red-500 rounded-full border border-white"></div>
@@ -34,7 +135,9 @@ export default function StampIt() {
         </header>
 
         <main className="flex-1">
-          {activeTab === "home" && <HomeView />}
+          {activeTab === "home" && (
+            <HomeView year={selectedYear} month={selectedMonth} />
+          )}
           {activeTab === "inbox" && <InboxView />}
           {activeTab === "friends" && <FriendsView />}
         </main>
@@ -67,12 +170,28 @@ export default function StampIt() {
   );
 }
 
-function HomeView() {
+function HomeView({ year, month }: { year: number; month: number }) {
   const [stamps, setStamps] = useState<
     Record<number, { img: string; memo: string; time: string }>
   >({});
   const [currentDay, setCurrentDay] = useState<number>(29);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Get days in month
+  const getDaysInMonth = (y: number, m: number) => {
+    return new Date(y, m + 1, 0).getDate();
+  };
+
+  // Get day name from date
+  const getDayName = (y: number, m: number, d: number) => {
+    const days = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+    return days[new Date(y, m, d).getDay()];
+  };
+
+  const daysInMonth = getDaysInMonth(year, month);
+
+  // Get first day of month (0 = Sunday)
+  const firstDayOfMonth = new Date(year, month, 1).getDay();
 
   const handleDayClick = (day: number) => {
     setCurrentDay(day);
@@ -85,7 +204,9 @@ function HomeView() {
       const reader = new FileReader();
       reader.onload = (event) => {
         const result = event.target?.result as string;
-        const timeStr = `26.04.${currentDay < 10 ? "0" + currentDay : currentDay}(Wed) 17:29`;
+        const monthStr = (month + 1).toString().padStart(2, "0");
+        const dayName = getDayName(year, month, currentDay);
+        const timeStr = `${year.toString().slice(2)}.${monthStr}.${currentDay < 10 ? "0" + currentDay : currentDay}(${dayName}) 17:29`;
         setStamps((prev) => ({
           ...prev,
           [currentDay]: {
@@ -129,7 +250,11 @@ function HomeView() {
             {d}
           </div>
         ))}
-        {Array.from({ length: 30 }).map((_, i) => {
+        {/* Empty cells for days before the first day of month */}
+        {Array.from({ length: firstDayOfMonth }).map((_, i) => (
+          <div key={`empty-${i}`} className="h-16"></div>
+        ))}
+        {Array.from({ length: daysInMonth }).map((_, i) => {
           const day = i + 1;
           const stamp = stamps[day];
           return (
@@ -186,7 +311,8 @@ function HomeView() {
           <div className="flex-1 flex flex-col justify-between min-h-[160px] py-1">
             <div className="space-y-3">
               <p className="text-[13px] font-bold text-gray-500">
-                {stamps[currentDay]?.time || "26.04.29(Wed) 17:29"}
+                {stamps[currentDay]?.time ||
+                  `${year.toString().slice(2)}.${(month + 1).toString().padStart(2, "0")}.${currentDay.toString().padStart(2, "0")}(${getDayName(year, month, currentDay)}) 17:29`}
               </p>
               <p className="text-[14px] text-gray-700 italic">
                 {stamps[currentDay]?.memo || "우표 내용 우표우표우표 (0/30)"}
