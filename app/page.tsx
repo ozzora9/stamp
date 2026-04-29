@@ -289,7 +289,8 @@ function HomeView({
 
   const isToday = (day: number) => {
     return (
-      (year === today.getFullYear()) & (month === today.getMonth()) &&
+      year === today.getFullYear() &&
+      month === today.getMonth() &&
       day === today.getDate()
     );
   };
