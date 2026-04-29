@@ -204,7 +204,7 @@ export default function StampIt() {
                   >
                     ‹
                   </button>
-                  <div className="w-20 text-center font-black text-xl">
+                  <div className="w-16 text-center font-black text-lg">
                     {MONTHS[selectedMonth]}
                   </div>
                   <button
