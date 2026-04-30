@@ -29,6 +29,32 @@ function InboxContent() {
     };
 
     fetchPostcards();
+
+    // 2. 🔥 실시간(Realtime) 구독 설정
+    // 내 닉네임으로 오는 엽서만 감시하도록 필터를 겁니다.
+    const channel = supabase
+      .channel(`inbox-${myName}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "INSERT", // 데이터 추가만 감지
+          schema: "public",
+          table: "postcards",
+          //   filter: `receiver_name=eq.${myName}`, // 내 우편함 필터링!
+        },
+        (payload) => {
+          console.log("새 엽서 도착!", payload);
+          setPostcards((prev) => [payload.new, ...prev]);
+        },
+      )
+      .subscribe((status) => {
+        console.log("구독 상태:", status); // 👈 'SUBSCRIBED'가 뜨는지 확인
+      });
+
+    // 3. 컴포넌트 언마운트 시 구독 해제
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, [myName]);
 
   return (

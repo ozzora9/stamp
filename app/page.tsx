@@ -45,8 +45,9 @@ export default function StampIt() {
     setSelectedMonth(now.getMonth());
   }, []);
 
-  // Supabase 데이터 로드 (연/월 변경 시 재실행)
+  // Supabase 데이터 로드 및 Realtime 구독
   useEffect(() => {
+    // 1. 기존 데이터 초기 로드
     const fetchStamps = async () => {
       const { data, error } = await supabase.from("stamps").select("*");
       if (error) {
@@ -59,17 +60,55 @@ export default function StampIt() {
           stampMap[s.date] = {
             img: s.image_url,
             memo: s.memo,
-            time: new Date(s.created_at).toLocaleTimeString([], {
-              hour: "2-digit",
-              minute: "2-digit",
-            }),
+            time: s.date, // 날짜를 그대로 저장
           };
         });
         setStamps(stampMap);
       }
     };
+
     fetchStamps();
-  }, [selectedYear, selectedMonth]);
+
+    // 2. Realtime 구독 설정
+    const channel = supabase
+      .channel("realtime-stamps")
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "stamps",
+        },
+        (payload) => {
+          console.log("데이터베이스 변경 감지!", payload);
+
+          if (payload.eventType === "INSERT") {
+            const newStamp = payload.new;
+            setStamps((prev) => ({
+              ...prev,
+              [newStamp.date]: {
+                img: newStamp.image_url,
+                memo: newStamp.memo,
+                time: newStamp.date,
+              },
+            }));
+          } else if (payload.eventType === "DELETE") {
+            const oldStamp = payload.old;
+            setStamps((prev) => {
+              const newStamps = { ...prev };
+              delete newStamps[oldStamp.date];
+              return newStamps;
+            });
+          }
+        },
+      )
+      .subscribe();
+
+    // 3. 컴포넌트 언마운트 시 구독 해제
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, []);
 
   const isToday =
     today &&
