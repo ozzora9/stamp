@@ -85,9 +85,10 @@ function InboxContent() {
           postcards.map((card) => (
             <div
               key={card.id}
-              className="bg-white p-6 shadow-md border border-gray-100 relative group animate-in fade-in slide-in-from-bottom-3 duration-700"
+              className="w-full bg-white p-6 shadow-md border border-gray-100 relative group flex flex-col min-h-[220px] animate-in fade-in slide-in-from-bottom-3 duration-700"
             >
-              <div className="absolute top-4 right-4 w-12 aspect-[3/4]">
+              {/* 우측 상단 우표 구역 (보낼 때 배치했던 그 위치 그대로) */}
+              <div className="absolute top-4 right-4 w-12 aspect-[3/4] shadow-sm">
                 <div
                   className="w-full h-full bg-cover bg-center"
                   style={{
@@ -99,16 +100,27 @@ function InboxContent() {
                   }}
                 />
               </div>
-              <div className="space-y-4">
+
+              {/* 엽서 상단 정보 (From 헤더) */}
+              <div className="space-y-1 mb-4">
                 <div className="text-[10px] text-gray-400 tracking-widest uppercase italic">
                   From. {card.sender_name}
                 </div>
-                <p className="text-[15px] leading-relaxed text-gray-700">
-                  {card.message}
-                </p>
-                <div className="text-[9px] text-gray-300 text-right">
-                  {new Date(card.created_at).toLocaleDateString()}
-                </div>
+              </div>
+
+              {/* 엽서 본문 내용 (보낼 때 작성자가 줄바꿈한 것까지 그대로 보존) */}
+              <p className="text-[15px] leading-relaxed text-gray-700 font-anemone flex-1 whitespace-pre-wrap">
+                {card.message}
+              </p>
+
+              {/* 엽서 하단 메타데이터 (우측 정렬된 타임스탬프) */}
+              <div className="text-[9px] text-gray-300 text-right mt-4 border-t border-gray-50 pt-2">
+                {new Date(card.created_at).toLocaleDateString("ko-KR", {
+                  year: "2-digit",
+                  month: "2-digit",
+                  day: "2-digit",
+                  weekday: "short",
+                })}
               </div>
             </div>
           ))
