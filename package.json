@@ -6,7 +6,9 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "bench:http": "node bench/http-bench.js",
+    "bench:ws": "node bench/ws-bench.js"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.105.1",
