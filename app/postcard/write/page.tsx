@@ -15,8 +15,14 @@ function PostcardWriteContent() {
   const [allStamps, setAllStamps] = useState<any[]>([]);
   const [selectedStamp, setSelectedStamp] = useState<any>(null);
   const [receiverName, setReceiverName] = useState("누구");
-  const [senderName, setSenderName] = useState("송은"); // [사용자이름] 대용
+  const [senderName, setSenderName] = useState("보내는 이");
   const [message, setMessage] = useState("");
+  const [userId, setUserId] = useState<string | null>(null);
+  const [friends, setFriends] = useState<string[]>([]);
+  const [showFriendsPopup, setShowFriendsPopup] = useState(false);
+
+  const getFriendStorageKey = (id: string | null) =>
+    id ? `stampit_friends_${id}` : "";
 
   const todayStr = new Date()
     .toLocaleDateString("en-US", {
@@ -27,12 +33,51 @@ function PostcardWriteContent() {
     .toUpperCase();
 
   useEffect(() => {
-    fetchAllStamps();
+    const init = async () => {
+      const { data } = await supabase.auth.getSession();
+      const user = data.session?.user;
+      const id = user?.id ?? null;
+      setUserId(id);
+      const metadata = user?.user_metadata as Record<string, any> | undefined;
+      const nickname = metadata?.nickname || metadata?.name || "보내는 이";
+      setSenderName(nickname);
+
+      if (!id) {
+        setFriends([]);
+        return;
+      }
+
+      const saved = localStorage.getItem(getFriendStorageKey(id));
+      if (saved) {
+        try {
+          setFriends(JSON.parse(saved));
+        } catch {
+          setFriends([]);
+        }
+      }
+    };
+
+    init();
   }, []);
+
+  useEffect(() => {
+    if (!userId) return;
+    fetchAllStamps();
+  }, [userId]);
 
   const handleSendPostcard = async () => {
     if (!selectedStamp || !message.trim()) {
       alert("우표를 붙이고 마음을 적어주세요! 📮");
+      return;
+    }
+
+    if (friends.length === 0) {
+      alert("먼저 친구를 등록한 뒤, 친구를 선택해 주세요.");
+      return;
+    }
+
+    if (!friends.includes(receiverName)) {
+      alert("수신인은 친구 목록에서 선택해 주세요.");
       return;
     }
 
@@ -50,19 +95,28 @@ function PostcardWriteContent() {
       alert("우편 배달 사고가 났어요. 다시 시도해 주세요!");
     } else {
       alert("엽서가 우체통에 쏙 들어갔습니다! ✨");
-      router.push("/inbox"); // 전송 후 바로 수신함으로 이동해서 확인!
+      router.push("/");
     }
   };
 
   const fetchAllStamps = async () => {
-    const { data } = await supabase
+    if (!userId) return;
+
+    const { data, error } = await supabase
       .from("stamps")
       .select("*")
+      .eq("user_id", userId)
       .order("created_at", { ascending: false });
+
+    if (error) {
+      console.error("우표 로드 실패:", error);
+      return;
+    }
+
     if (data) {
       setAllStamps(data);
       const initial = data.find((s: any) => s.date === initialDate);
-      setSelectedStamp(initial || data[0]);
+      setSelectedStamp(initial || data[0] || null);
     }
   };
 
@@ -96,17 +150,64 @@ function PostcardWriteContent() {
           </h1>
         </header>
 
-        <div className="flex items-baseline gap-2 px-4 mb-2">
+        <div className="flex items-baseline gap-2 px-4 mb-2 relative">
           <span className="text-gray-400 text-[10px] tracking-widest uppercase">
             send to.
           </span>
           <button
-            onClick={() => alert("친구 목록 팝업 예정!")}
+            onClick={() => setShowFriendsPopup(true)}
             className="text-[14px] border-b-2 border-black hover:opacity-50 transition-opacity"
           >
             {receiverName}
           </button>
         </div>
+
+        {showFriendsPopup ? (
+          <div
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4 py-8"
+            onClick={() => setShowFriendsPopup(false)}
+          >
+            <div
+              className="w-full max-w-md rounded-3xl bg-white p-5 shadow-2xl"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex items-center justify-between mb-4">
+                <div className="text-base font-bold">친구 목록</div>
+                <button
+                  onClick={() => setShowFriendsPopup(false)}
+                  className="text-sm text-gray-500 hover:text-black"
+                >
+                  닫기
+                </button>
+              </div>
+              {friends.length === 0 ? (
+                <div className="rounded-3xl border border-dashed border-gray-300 bg-gray-50 p-8 text-center text-sm text-gray-500">
+                  아직 친구가 없어요.
+                  <div className="mt-2 text-xs text-gray-400">
+                    친구를 추가하면 여기에서 선택할 수 있어요.
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {friends.map((friend) => (
+                    <button
+                      key={friend}
+                      type="button"
+                      onClick={() => {
+                        setReceiverName(friend);
+                        setShowFriendsPopup(false);
+                      }}
+                      className="w-full rounded-3xl border border-gray-200 bg-gray-50 px-4 py-3 text-left text-sm font-medium hover:bg-gray-100"
+                    >
+                      {friend}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        ) : null}
+
         {/* 2. 엽서 본체 */}
         <div className="mx-2 aspect-[1.4/1] bg-[#fdfcf0] shadow-xl border border-gray-200 relative flex overflow-hidden rounded-sm">
           {/* 종이 질감 오버레이 */}
@@ -155,10 +256,10 @@ function PostcardWriteContent() {
               </div>
             </div>
 
-            {/* 고정 텍스트 ([사용자이름]이가) */}
+            {/* 고정 텍스트 (From. 닉네임) */}
             <div className="w-full space-y-2 opacity-30 select-none text-[9px] pr-1">
               <div className="border-b border-gray-300 pb-1 italic leading-none text-right">
-                {senderName}이가
+                From. {senderName}
               </div>
               <div className="text-[8px] text-right tracking-tighter uppercase">
                 지구 어딘가에서...
@@ -186,25 +287,31 @@ function PostcardWriteContent() {
           </div>
 
           <div className="flex gap-4 overflow-x-auto py-4 scrollbar-hide">
-            {allStamps.map((stamp) => (
-              <div
-                key={stamp.id}
-                draggable
-                onDragStart={(e) => onDragStart(e, stamp)}
-                className="flex-shrink-0 w-16 aspect-[3/4] bg-white p-1 shadow-md cursor-grab active:scale-95 transition-all border border-gray-50"
-              >
-                <div
-                  className="w-full h-full bg-cover bg-center"
-                  style={{
-                    backgroundImage: `url(${stamp.image_url})`,
-                    maskImage: STAMP_MASK,
-                    WebkitMaskImage: STAMP_MASK,
-                    maskSize: "100% 100%",
-                    WebkitMaskSize: "100% 100%",
-                  }}
-                />
+            {allStamps.length === 0 ? (
+              <div className="text-sm text-gray-400">
+                보유한 우표가 없습니다. 우표를 먼저 찍어보세요.
               </div>
-            ))}
+            ) : (
+              allStamps.map((stamp) => (
+                <div
+                  key={stamp.id}
+                  draggable
+                  onDragStart={(e) => onDragStart(e, stamp)}
+                  className="flex-shrink-0 w-16 aspect-[3/4] bg-white p-1 shadow-md cursor-grab active:scale-95 transition-all border border-gray-50"
+                >
+                  <div
+                    className="w-full h-full bg-cover bg-center"
+                    style={{
+                      backgroundImage: `url(${stamp.image_url})`,
+                      maskImage: STAMP_MASK,
+                      WebkitMaskImage: STAMP_MASK,
+                      maskSize: "100% 100%",
+                      WebkitMaskSize: "100% 100%",
+                    }}
+                  />
+                </div>
+              ))
+            )}
           </div>
           <p className="text-center text-gray-300 text-[10px] mt-2 italic">
             우표를 엽서 오른쪽 상단에 끌어다 놓으세요

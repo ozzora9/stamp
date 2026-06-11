@@ -23,11 +23,12 @@ const MONTHS = [
 const STAMP_MASK = `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='160' viewBox='0 0 120 160'%3E%3Cmask id='m'%3E%3Crect width='120' height='160' fill='white'/%3E%3Ccircle cx='0' cy='0' r='6' fill='black'/%3E%3Ccircle cx='20' cy='0' r='6' fill='black'/%3E%3Ccircle cx='40' cy='0' r='6' fill='black'/%3E%3Ccircle cx='60' cy='0' r='6' fill='black'/%3E%3Ccircle cx='80' cy='0' r='6' fill='black'/%3E%3Ccircle cx='100' cy='0' r='6' fill='black'/%3E%3Ccircle cx='120' cy='0' r='6' fill='black'/%3E%3Ccircle cx='0' cy='160' r='6' fill='black'/%3E%3Ccircle cx='20' cy='160' r='6' fill='black'/%3E%3Ccircle cx='40' cy='160' r='6' fill='black'/%3E%3Ccircle cx='60' cy='160' r='6' fill='black'/%3E%3Ccircle cx='80' cy='160' r='6' fill='black'/%3E%3Ccircle cx='100' cy='160' r='6' fill='black'/%3E%3Ccircle cx='120' cy='160' r='6' fill='black'/%3E%3Ccircle cx='0' cy='20' r='6' fill='black'/%3E%3Ccircle cx='0' cy='40' r='6' fill='black'/%3E%3Ccircle cx='0' cy='60' r='6' fill='black'/%3E%3Ccircle cx='0' cy='80' r='6' fill='black'/%3E%3Ccircle cx='0' cy='100' r='6' fill='black'/%3E%3Ccircle cx='0' cy='120' r='6' fill='black'/%3E%3Ccircle cx='0' cy='140' r='6' fill='black'/%3E%3Ccircle cx='120' cy='20' r='6' fill='black'/%3E%3Ccircle cx='120' cy='40' r='6' fill='black'/%3E%3Ccircle cx='120' cy='60' r='6' fill='black'/%3E%3Ccircle cx='120' cy='80' r='6' fill='black'/%3E%3Ccircle cx='120' cy='100' r='6' fill='black'/%3E%3Ccircle cx='120' cy='120' r='6' fill='black'/%3E%3Ccircle cx='120' cy='140' r='6' fill='black'/%3E%3C/mask%3E%3Crect width='120' height='160' fill='white' mask='url(%23m)'/%3E%3C/svg%3E")`;
 
 export default function StampIt() {
-  const [activeTab, setActiveTab] = useState("home");
   const [today, setToday] = useState<Date | null>(null);
   const [selectedYear, setSelectedYear] = useState(2026);
   const [selectedMonth, setSelectedMonth] = useState(3);
   const [showDial, setShowDial] = useState(false);
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [userId, setUserId] = useState<string | null>(null);
   const dialRef = useRef<HTMLDivElement>(null);
   const router = useRouter();
 
@@ -45,11 +46,38 @@ export default function StampIt() {
     setSelectedMonth(now.getMonth());
   }, []);
 
+  useEffect(() => {
+    const loadSession = async () => {
+      const { data } = await supabase.auth.getSession();
+      const currentUser = data.session?.user;
+      setIsLoggedIn(!!currentUser);
+      setUserId(currentUser?.id ?? null);
+    };
+
+    loadSession();
+
+    const { data: authListener } = supabase.auth.onAuthStateChange(
+      (_event, session) => {
+        setIsLoggedIn(!!session);
+        setUserId(session?.user?.id ?? null);
+      },
+    );
+
+    return () => {
+      authListener?.subscription?.unsubscribe();
+    };
+  }, []);
+
   // Supabase 데이터 로드 및 Realtime 구독
   useEffect(() => {
+    if (!userId) return;
+
     // 1. 기존 데이터 초기 로드
     const fetchStamps = async () => {
-      const { data, error } = await supabase.from("stamps").select("*");
+      const { data, error } = await supabase
+        .from("stamps")
+        .select("*")
+        .eq("user_id", userId);
       if (error) {
         console.error("데이터 로드 실패:", error);
         return;
@@ -78,6 +106,7 @@ export default function StampIt() {
           event: "*",
           schema: "public",
           table: "stamps",
+          filter: `user_id=eq.${userId}`,
         },
         (payload) => {
           console.log("데이터베이스 변경 감지!", payload);
@@ -108,7 +137,7 @@ export default function StampIt() {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, []);
+  }, [userId]);
 
   const isToday =
     today &&
@@ -138,6 +167,10 @@ export default function StampIt() {
   // 업로드 및 저장 로직
   const handlePunchComplete = async (croppedImg: string) => {
     if (targetDay === null) return;
+    if (!userId) {
+      alert("로그인이 필요합니다.");
+      return;
+    }
     setIsPunching(true);
     try {
       const res = await fetch(croppedImg);
@@ -159,6 +192,7 @@ export default function StampIt() {
           date: dateKey,
           image_url: publicUrl,
           memo: "오늘의 소중한 한 조각",
+          user_id: userId,
         },
       ]);
       if (dbError) throw dbError;
@@ -257,49 +291,57 @@ export default function StampIt() {
               </div>
             )}
           </div>
-          <button onClick={() => router.push("/inbox")} className="relative">
-            <span className="text-[13px]">send →</span>
+          <button
+            onClick={() => {
+              if (isLoggedIn) {
+                const date = today || new Date();
+                router.push(
+                  `/postcard/write?date=${date.getFullYear()}-${date.getMonth()}-${date.getDate()}`,
+                );
+              } else {
+                router.push("/auth");
+              }
+            }}
+            className="relative"
+          >
+            <span className="text-[13px]">
+              {isLoggedIn ? "send →" : "login →"}
+            </span>
             {/* <div className="absolute -top-0.5 -right-0.5 w-2 h-2 bg-red-500 rounded-full border border-white"></div> */}
           </button>
         </header>
 
         <main className="flex-1">
-          {activeTab === "home" && (
-            <HomeView
-              year={selectedYear}
-              month={selectedMonth}
-              today={today || new Date()}
-              stamps={stamps}
-              setStamps={setStamps}
-              onPunchComplete={handlePunchComplete}
-              isPunching={isPunching}
-              setTargetDay={setTargetDay}
-            />
-          )}
-          {activeTab === "inbox" && <InboxView />}
-          {activeTab === "friends" && <FriendsView />}
+          <HomeView
+            year={selectedYear}
+            month={selectedMonth}
+            today={today || new Date()}
+            stamps={stamps}
+            setStamps={setStamps}
+            onPunchComplete={handlePunchComplete}
+            isPunching={isPunching}
+            setTargetDay={setTargetDay}
+          />
         </main>
 
         <nav className="fixed bottom-0 w-[375px] bg-[#fdfcf0]/90 backdrop-blur-sm border-t border-dashed border-gray-300 py-4 px-8 flex justify-between items-center z-20">
-          <button
-            onClick={() => setActiveTab("home")}
-            className={`text-[13px] ${activeTab === "home" ? "opacity-100" : "opacity-30"}`}
-          >
-            home
-          </button>
+          <button className="text-[13px] opacity-100">home</button>
           <button
             onClick={() => router.push("/inbox")}
-            className={`text-[13px] ${activeTab === "inbox" ? "opacity-100" : "opacity-30"}`}
+            className="text-[13px] transition hover:text-black"
           >
             inbox
           </button>
           <button
-            onClick={() => router.push("/")}
-            className={`text-[13px] ${activeTab === "friends" ? "opacity-100" : "opacity-30"}`}
+            onClick={() => router.push("/friends")}
+            className="text-[13px] transition hover:text-black"
           >
             friends
           </button>
-          <button className="opacity-30 text-[13px] grayscale cursor-not-allowed">
+          <button
+            onClick={() => router.push("/setting")}
+            className="text-[13px] transition hover:text-black"
+          >
             setting
           </button>
         </nav>
@@ -359,7 +401,7 @@ function HomeView({
   };
 
   const handleGoToEditor = () => {
-    const dateKey = `${year}-${month}-${currentDay}`;
+    const dateKey = `${today.getFullYear()}-${today.getMonth()}-${today.getDate()}`;
     // 예: /postcard/write?date=2026-3-29 형태로 이동
     router.push(`/postcard/write?date=${dateKey}`);
   };
@@ -377,6 +419,13 @@ function HomeView({
   const getDayName = (y: number, m: number, d: number) => {
     const days = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
     return days[new Date(y, m, d).getDay()];
+  };
+
+  const formatStampTime = (time: string) => {
+    const [y, m, d] = time.split("-").map(Number);
+    if (!y || m == null || !d) return time;
+    const monthNumber = m + 1;
+    return `${y.toString().slice(2)}.${String(monthNumber).padStart(2, "0")}.${String(d).padStart(2, "0")}(${getDayName(y, m, d)})`;
   };
 
   return (
@@ -464,12 +513,15 @@ function HomeView({
           <div className="flex-1 flex flex-col justify-between min-h-[160px] py-1">
             <div className="space-y-3">
               <p className="text-[13px] font-anemone text-gray-700">
-                {stamps[`${year}-${month}-${currentDay}`]?.time ||
-                  `${year.toString().slice(2)}.${(month + 1).toString().padStart(2, "0")}.${currentDay.toString().padStart(2, "0")}(${getDayName(year, month, currentDay)})`}
+                {stamps[`${year}-${month}-${currentDay}`]?.time
+                  ? formatStampTime(
+                      stamps[`${year}-${month}-${currentDay}`].time,
+                    )
+                  : `${year.toString().slice(2)}.${(month + 1).toString().padStart(2, "0")}.${currentDay.toString().padStart(2, "0")}(${getDayName(year, month, currentDay)})`}
               </p>
               <p className="text-[14px] text-gray-700 font-anemone">
                 {stamps[`${year}-${month}-${currentDay}`]?.memo ||
-                  "우표 내용 우표우표우표"}
+                  "오늘의 한 조각을 채워보세요"}
               </p>
             </div>
             <div className="flex gap-5 mt-auto">
@@ -592,21 +644,6 @@ function CropModal({ image, onClose, onCrop, isAnimating }: any) {
           </button>
         </div>
       </div>
-    </div>
-  );
-}
-
-function InboxView() {
-  return (
-    <div className="py-20 text-center text-gray-400 italic text-sm">
-      우편함 비어있음
-    </div>
-  );
-}
-function FriendsView() {
-  return (
-    <div className="py-20 text-center text-gray-400 italic text-sm">
-      친구 목록...
     </div>
   );
 }

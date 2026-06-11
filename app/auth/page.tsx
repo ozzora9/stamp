@@ -91,6 +91,7 @@ export default function AuthPage() {
   };
 
   // 4. 폼 제출 핸들러 (Supabase 연동)
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -119,16 +120,26 @@ export default function AuthPage() {
     try {
       if (mode === "login") {
         // --- 로그인 로직 ---
-        const { error } = await supabase.auth.signInWithPassword({
+        const { data, error } = await supabase.auth.signInWithPassword({
           email,
           password,
         });
 
         if (error) throw error;
 
-        showToast("로그인에 성공했습니다! 이름을 정해주세요. 📬", "success");
+        const user =
+          data?.user || data?.session?.user ||
+          (await supabase.auth.getSession()).data.session?.user;
+        const metadata = user?.user_metadata as Record<string, any> | undefined;
+        const nickname = metadata?.nickname || metadata?.name || "";
+
+        showToast("로그인에 성공했습니다!", "success");
         setTimeout(() => {
-          router.push("/name");
+          if (!nickname.trim()) {
+            router.push("/name");
+          } else {
+            router.push("/");
+          }
         }, 500);
       } else {
         // --- 회원가입 로직 ---
@@ -138,19 +149,38 @@ export default function AuthPage() {
           return;
         }
 
-        const { error } = await supabase.auth.signUp({
+        const { data, error } = await supabase.auth.signUp({
           email,
           password,
         });
 
         if (error) throw error;
 
+        const user =
+          data?.user ||
+          (await supabase.auth.getSession()).data.session?.user;
+        const userId = user?.id;
+        const metadata = user?.user_metadata as Record<string, any> | undefined;
+        const nickname = metadata?.nickname || metadata?.name || "";
+
+        if (userId) {
+          await supabase
+            .from("profiles")
+            .upsert([{ user_id: userId, nickname: "" }], {
+              onConflict: "user_id",
+            });
+        }
+
         showToast(
           "회원가입이 완료되었습니다! 이름을 정해주세요. 💌",
           "success",
         );
         resetForm();
-        router.push("/name");
+        if (!nickname.trim()) {
+          router.push("/name");
+        } else {
+          router.push("/");
+        }
       }
     } catch (err: any) {
       // Supabase 에러 메시지 한국어 친화적 가공

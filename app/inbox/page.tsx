@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, Suspense } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { supabase } from "@/src/lib/supabase";
 
 // 톱니 마스크 스타일 (공통)
@@ -9,49 +9,73 @@ const STAMP_MASK = `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000
 
 function InboxContent() {
   const router = useRouter();
-  const searchParams = useSearchParams();
-  const myName = searchParams.get("name") || "누구"; // 주소창에 ?name=송은 처럼 검색 가능
-
+  const [myName, setMyName] = useState<string | null>(null);
   const [postcards, setPostcards] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    const loadSession = async () => {
+      const { data, error } = await supabase.auth.getSession();
+      if (error) {
+        console.error("세션 조회 실패:", error);
+        setLoading(false);
+        return;
+      }
+
+      const user = data.session?.user;
+      if (!user) {
+        setLoading(false);
+        return;
+      }
+
+      const metadata = user.user_metadata as Record<string, any> | undefined;
+      const nickname = metadata?.nickname || metadata?.name || null;
+      setMyName(nickname);
+    };
+
+    loadSession();
+  }, []);
+
+  useEffect(() => {
+    if (!myName) {
+      setLoading(false);
+      return;
+    }
+
     const fetchPostcards = async () => {
-      // 닉네임 기반으로 필터링해서 가져오기
       const { data, error } = await supabase
         .from("postcards")
         .select("*")
         .eq("receiver_name", myName)
         .order("created_at", { ascending: false });
 
-      if (data) setPostcards(data);
+      if (error) {
+        console.error("우편함 로드 실패:", error);
+      } else if (data) {
+        setPostcards(data);
+      }
       setLoading(false);
     };
 
     fetchPostcards();
 
-    // 2. 🔥 실시간(Realtime) 구독 설정
-    // 내 닉네임으로 오는 엽서만 감시하도록 필터를 겁니다.
     const channel = supabase
       .channel(`inbox-${myName}`)
       .on(
         "postgres_changes",
         {
-          event: "INSERT", // 데이터 추가만 감지
+          event: "INSERT",
           schema: "public",
           table: "postcards",
-          //   filter: `receiver_name=eq.${myName}`, // 내 우편함 필터링!
+          filter: `receiver_name=eq.${myName}`,
         },
         (payload) => {
           console.log("새 엽서 도착!", payload);
           setPostcards((prev) => [payload.new, ...prev]);
         },
       )
-      .subscribe((status) => {
-        console.log("구독 상태:", status); // 👈 'SUBSCRIBED'가 뜨는지 확인
-      });
+      .subscribe();
 
-    // 3. 컴포넌트 언마운트 시 구독 해제
     return () => {
       supabase.removeChannel(channel);
     };
@@ -68,7 +92,7 @@ function InboxContent() {
         </button>
         <h1 className="text-4xl font-black tracking-tighter">INBOX</h1>
         <p className="text-[10px] text-gray-400 tracking-widest uppercase">
-          {myName}님의 우체통
+          {myName ? `${myName}님의 우체통` : "로그인 후 확인하세요"}
         </p>
       </header>
 
