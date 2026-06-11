@@ -14,7 +14,7 @@ export default function FriendsPage() {
   const [userId, setUserId] = useState<string | null>(null);
 
   const getFriendStorageKey = (id: string | null) =>
-    id ? `stampit_friends_${id}` : "";
+    id ? `stampit_friends_${id}` : "stampit_friends_last";
 
   useEffect(() => {
     const loadSession = async () => {
@@ -24,11 +24,6 @@ export default function FriendsPage() {
       const id = user?.id ?? null;
       setMyNickname(metadata?.nickname || metadata?.name || null);
       setUserId(id);
-
-      if (!id) {
-        setFriends([]);
-        return;
-      }
 
       const saved = localStorage.getItem(getFriendStorageKey(id));
       if (saved) {
@@ -45,11 +40,11 @@ export default function FriendsPage() {
 
   const saveFriends = (nextFriends: string[]) => {
     setFriends(nextFriends);
-    if (!userId) return;
-    localStorage.setItem(
-      getFriendStorageKey(userId),
-      JSON.stringify(nextFriends),
-    );
+    const storageKey = getFriendStorageKey(userId);
+    localStorage.setItem(storageKey, JSON.stringify(nextFriends));
+    if (userId) {
+      localStorage.setItem("stampit_friends_last", JSON.stringify(nextFriends));
+    }
   };
 
   const verifyFriend = async (nickname: string) => {
