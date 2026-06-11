@@ -126,12 +126,9 @@ export default function AuthPage() {
 
         if (error) throw error;
 
-        showToast(
-          "로그인에 성공했습니다! 우표첩으로 이동합니다. 📬",
-          "success",
-        );
+        showToast("로그인에 성공했습니다! 이름을 정해주세요. 📬", "success");
         setTimeout(() => {
-          router.push("/");
+          router.push("/name");
         }, 500);
       } else {
         // --- 회원가입 로직 ---
@@ -149,11 +146,11 @@ export default function AuthPage() {
         if (error) throw error;
 
         showToast(
-          "회원가입이 완료되었습니다! 인증 메일을 확인해주세요. 💌",
+          "회원가입이 완료되었습니다! 이름을 정해주세요. 💌",
           "success",
         );
-        setMode("login");
         resetForm();
+        router.push("/name");
       }
     } catch (err: any) {
       // Supabase 에러 메시지 한국어 친화적 가공
