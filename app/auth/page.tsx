@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import { supabase } from "@/src/lib/supabase";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 
 // 1. 토스트 메시지 타입 정의
 interface Toast {
@@ -22,6 +22,42 @@ export default function AuthPage() {
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+
+  // 입력 유효성 오류 상태
+  const [errors, setErrors] = useState<{
+    email?: string;
+    password?: string;
+    confirmPassword?: string;
+  }>({});
+
+  const [touched, setTouched] = useState<{
+    email?: boolean;
+    password?: boolean;
+    confirmPassword?: boolean;
+  }>({});
+
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+  const validateEmail = (value: string) => {
+    if (mode === "login") return "";
+    if (!value) return "이메일을 입력해 주세요.";
+    if (!emailRegex.test(value)) return "올바른 이메일 주소가 아닙니다";
+    return "";
+  };
+
+  const validatePassword = (value: string) => {
+    if (mode === "login") return "";
+    if (!value) return "비밀번호를 입력해 주세요";
+    if (!/[A-Za-z]/.test(value) || !/[0-9]/.test(value) || value.length < 8)
+      return "비밀번호는 영문, 숫자 조합 8자 이상 입력해 주세요";
+    return "";
+  };
+
+  const validateConfirmPassword = (value: string) => {
+    if (!value) return "비밀번호 확인을 입력해 주세요";
+    if (password !== value) return "비밀번호가 일치하지 않습니다";
+    return "";
+  };
 
   // 토스트 리스트 상태
   const [toasts, setToasts] = useState<Toast[]>([]);
@@ -50,14 +86,31 @@ export default function AuthPage() {
     setEmail("");
     setPassword("");
     setConfirmPassword("");
+    setErrors({});
+    setTouched({});
   };
 
   // 4. 폼 제출 핸들러 (Supabase 연동)
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!email || !password) {
-      showToast("이메일과 비밀번호를 모두 입력해주세요.", "error");
+    const emailError = mode === "signup" ? validateEmail(email) : "";
+    const passwordError = validatePassword(password);
+    const confirmPasswordError =
+      mode === "signup" ? validateConfirmPassword(confirmPassword) : "";
+
+    setTouched({
+      email: true,
+      password: true,
+      confirmPassword: mode === "signup",
+    });
+
+    if (emailError || passwordError || confirmPasswordError) {
+      setErrors({
+        email: emailError || undefined,
+        password: passwordError || undefined,
+        confirmPassword: confirmPasswordError || undefined,
+      });
       return;
     }
 
@@ -117,18 +170,19 @@ export default function AuthPage() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-[#f4f1ea] px-4 font-sans relative overflow-hidden">
+    <div className="min-h-screen flex items-center justify-center selection:bg-pink-100 px-4 font-sans relative overflow-hidden">
       {/* 백그라운드 아날로그 감성 격자 눈금 패턴 (선택 사항) */}
       <div
-        className="absolute inset-0 opacity-5 pointer-events-none"
+        className="fixed inset-0 pointer-events-none opacity-40"
         style={{
-          backgroundImage: "radial-gradient(#171717 1px, transparent 0)",
-          backgroundSize: "24px 24px",
+          backgroundImage:
+            "linear-gradient(rgba(0,0,0,0.03) 1px, transparent 1px), linear-gradient(90deg, rgba(0,0,0,0.03) 1px, transparent 1px)",
+          backgroundSize: "20px 20px",
         }}
-      ></div>
+      />
 
       {/* 메인 인증 카드 */}
-      <div className="w-full max-w-md bg-white border border-[#d1cbd1] rounded-2xl shadow-xl p-8 relative z-10 transition-all duration-300">
+      <div className="w-full max-w-md bg-white rounded-2xl shadow-xl p-8 relative z-10 transition-all duration-300">
         {/* 상단 타이틀 부 (Stamp-it 아이덴티티 계승) */}
         <button
           onClick={() => router.push("/")}
@@ -156,11 +210,38 @@ export default function AuthPage() {
             <input
               type="email"
               value={email}
-              onChange={(e) => setEmail(e.target.value)}
+              onChange={(e) => {
+                const nextValue = e.target.value;
+                setEmail(nextValue);
+                if (mode === "signup" && touched.email) {
+                  const nextError = validateEmail(nextValue);
+                  setErrors((prev) => ({
+                    ...prev,
+                    email: nextError || undefined,
+                  }));
+                }
+              }}
+              onBlur={() => {
+                if (mode === "signup") {
+                  setTouched((prev) => ({ ...prev, email: true }));
+                  const nextError = validateEmail(email);
+                  setErrors((prev) => ({
+                    ...prev,
+                    email: nextError || undefined,
+                  }));
+                }
+              }}
               placeholder="example@stamp.it"
-              className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#171717] focus:bg-white transition-all text-sm"
+              className={`w-full px-4 py-3 bg-gray-50 border rounded-xl focus:outline-none focus:ring-2 focus:ring-[#171717] focus:bg-white transition-all text-sm ${
+                errors.email
+                  ? "border-rose-500 bg-rose-50/40"
+                  : "border-gray-200"
+              }`}
               required
             />
+            {errors.email ? (
+              <p className="mt-2 text-xs text-rose-600">{errors.email}</p>
+            ) : null}
           </div>
 
           <div>
@@ -170,11 +251,46 @@ export default function AuthPage() {
             <input
               type="password"
               value={password}
-              onChange={(e) => setPassword(e.target.value)}
+              onChange={(e) => {
+                const nextValue = e.target.value;
+                setPassword(nextValue);
+                if (mode === "signup" && touched.password) {
+                  const nextError = validatePassword(nextValue);
+                  setErrors((prev) => ({
+                    ...prev,
+                    password: nextError || undefined,
+                  }));
+                }
+                if (mode === "signup" && touched.confirmPassword) {
+                  const nextConfirmError =
+                    validateConfirmPassword(confirmPassword);
+                  setErrors((prev) => ({
+                    ...prev,
+                    confirmPassword: nextConfirmError || undefined,
+                  }));
+                }
+              }}
+              onBlur={() => {
+                if (mode === "signup") {
+                  setTouched((prev) => ({ ...prev, password: true }));
+                  const nextError = validatePassword(password);
+                  setErrors((prev) => ({
+                    ...prev,
+                    password: nextError || undefined,
+                  }));
+                }
+              }}
               placeholder="••••••••"
-              className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#171717] focus:bg-white transition-all text-sm"
-              required
+              className={`w-full px-4 py-3 bg-gray-50 border rounded-xl focus:outline-none focus:ring-2 focus:ring-[#171717] focus:bg-white transition-all text-sm ${
+                errors.password
+                  ? "border-rose-500 bg-rose-50/40"
+                  : "border-gray-200"
+              }`}
+              required={mode === "signup"}
             />
+            {errors.password ? (
+              <p className="mt-2 text-xs text-rose-600">{errors.password}</p>
+            ) : null}
           </div>
 
           {/* 회원가입 모드일 때만 비밀번호 확인 칸 렌더링 */}
@@ -186,11 +302,38 @@ export default function AuthPage() {
               <input
                 type="password"
                 value={confirmPassword}
-                onChange={(e) => setConfirmPassword(e.target.value)}
+                onChange={(e) => {
+                  const nextValue = e.target.value;
+                  setConfirmPassword(nextValue);
+                  if (touched.confirmPassword) {
+                    const nextError = validateConfirmPassword(nextValue);
+                    setErrors((prev) => ({
+                      ...prev,
+                      confirmPassword: nextError || undefined,
+                    }));
+                  }
+                }}
+                onBlur={() => {
+                  setTouched((prev) => ({ ...prev, confirmPassword: true }));
+                  const nextError = validateConfirmPassword(confirmPassword);
+                  setErrors((prev) => ({
+                    ...prev,
+                    confirmPassword: nextError || undefined,
+                  }));
+                }}
                 placeholder="••••••••"
-                className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#171717] focus:bg-white transition-all text-sm"
+                className={`w-full px-4 py-3 bg-gray-50 border rounded-xl focus:outline-none focus:ring-2 focus:ring-[#171717] focus:bg-white transition-all text-sm ${
+                  errors.confirmPassword
+                    ? "border-rose-500 bg-rose-50/40"
+                    : "border-gray-200"
+                }`}
                 required={mode === "signup"}
               />
+              {errors.confirmPassword ? (
+                <p className="mt-2 text-xs text-rose-600">
+                  {errors.confirmPassword}
+                </p>
+              ) : null}
             </div>
           )}
 
@@ -203,9 +346,9 @@ export default function AuthPage() {
             {isLoading ? (
               <span className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
             ) : mode === "login" ? (
-              "로그인"
+              "로그인하기"
             ) : (
-              "회원가입 완료"
+              "가입하기"
             )}
           </button>
         </form>

@@ -58,7 +58,7 @@ function InboxContent() {
   }, [myName]);
 
   return (
-    <div className="w-[375px] relative pt-12 pb-24 px-4 z-10 flex flex-col min-h-screen font-anemone">
+    <div className="w-[375px] relative pt-12 pb-24 px-4 z-10 selection:bg-pink-100 flex flex-col min-h-screen font-anemone">
       <header className="mb-10">
         <button
           onClick={() => router.push("/")}
