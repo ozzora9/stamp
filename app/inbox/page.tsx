@@ -10,8 +10,12 @@ const STAMP_MASK = `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000
 function InboxContent() {
   const router = useRouter();
   const [myName, setMyName] = useState<string | null>(null);
+  const [userId, setUserId] = useState<string | null>(null);
   const [postcards, setPostcards] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+
+  const getInboxLastSeenKey = (id: string | null) =>
+    id ? `stampit_inbox_last_seen_${id}` : "";
 
   useEffect(() => {
     const loadSession = async () => {
@@ -28,9 +32,14 @@ function InboxContent() {
         return;
       }
 
+      const id = user.id;
+      setUserId(id);
       const metadata = user.user_metadata as Record<string, any> | undefined;
       const nickname = metadata?.nickname || metadata?.name || null;
       setMyName(nickname);
+      if (id) {
+        window.localStorage.setItem(getInboxLastSeenKey(id), `${Date.now()}`);
+      }
     };
 
     loadSession();

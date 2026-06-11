@@ -29,8 +29,50 @@ export default function StampIt() {
   const [showDial, setShowDial] = useState(false);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [userId, setUserId] = useState<string | null>(null);
+  const [myName, setMyName] = useState<string | null>(null);
+  const [hasNewInbox, setHasNewInbox] = useState(false);
   const dialRef = useRef<HTMLDivElement>(null);
   const router = useRouter();
+
+  const getInboxLastSeenKey = (id: string | null) =>
+    id ? `stampit_inbox_last_seen_${id}` : "";
+
+  const markInboxRead = () => {
+    if (userId) {
+      window.localStorage.setItem(getInboxLastSeenKey(userId), `${Date.now()}`);
+    }
+    setHasNewInbox(false);
+  };
+
+  const checkInboxUnread = async (
+    id: string | null,
+    nickname: string | null,
+  ) => {
+    if (!id || !nickname) {
+      setHasNewInbox(false);
+      return;
+    }
+
+    const lastSeenValue = window.localStorage.getItem(getInboxLastSeenKey(id));
+    const lastSeen = lastSeenValue ? Number(lastSeenValue) : null;
+
+    const { data, error } = await supabase
+      .from("postcards")
+      .select("created_at")
+      .eq("receiver_name", nickname)
+      .order("created_at", { ascending: false })
+      .limit(1);
+
+    if (error || !data?.length) {
+      setHasNewInbox(false);
+      return;
+    }
+
+    const latest = data[0]?.created_at;
+    const latestTime = latest ? new Date(latest).getTime() : 0;
+    const unread = !lastSeen || latestTime > lastSeen;
+    setHasNewInbox(unread);
+  };
 
   // 데이터 상태 관리 (부모에서 통합 관리)
   const [stamps, setStamps] = useState<
@@ -51,15 +93,34 @@ export default function StampIt() {
       const { data } = await supabase.auth.getSession();
       const currentUser = data.session?.user;
       setIsLoggedIn(!!currentUser);
-      setUserId(currentUser?.id ?? null);
+      const id = currentUser?.id ?? null;
+      setUserId(id);
+
+      const metadata = currentUser?.user_metadata as
+        | Record<string, any>
+        | undefined;
+      const nickname = metadata?.nickname || metadata?.name || null;
+      setMyName(nickname || null);
+
+      await checkInboxUnread(id, nickname);
     };
 
     loadSession();
 
     const { data: authListener } = supabase.auth.onAuthStateChange(
-      (_event, session) => {
+      async (_event, session) => {
+        const currentUser = session?.user;
         setIsLoggedIn(!!session);
-        setUserId(session?.user?.id ?? null);
+        const id = currentUser?.id ?? null;
+        setUserId(id);
+
+        const metadata = currentUser?.user_metadata as
+          | Record<string, any>
+          | undefined;
+        const nickname = metadata?.nickname || metadata?.name || null;
+        setMyName(nickname || null);
+
+        await checkInboxUnread(id, nickname);
       },
     );
 
@@ -67,6 +128,31 @@ export default function StampIt() {
       authListener?.subscription?.unsubscribe();
     };
   }, []);
+
+  useEffect(() => {
+    if (!myName) return;
+
+    const channel = supabase
+      .channel(`inbox-notify-${myName}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "INSERT",
+          schema: "public",
+          table: "postcards",
+          filter: `receiver_name=eq.${myName}`,
+        },
+        () => {
+          console.log("새 엽서 도착!");
+          setHasNewInbox(true);
+        },
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [myName, userId]);
 
   // Supabase 데이터 로드 및 Realtime 구독
   useEffect(() => {
@@ -327,10 +413,16 @@ export default function StampIt() {
         <nav className="fixed bottom-0 w-[375px] bg-[#fdfcf0]/90 backdrop-blur-sm border-t border-dashed border-gray-300 py-4 px-8 flex justify-between items-center z-20">
           <button className="text-[13px] opacity-100">home</button>
           <button
-            onClick={() => router.push("/inbox")}
-            className="text-[13px] transition hover:text-black"
+            onClick={() => {
+              markInboxRead();
+              router.push("/inbox");
+            }}
+            className="relative text-[13px] transition hover:text-black"
           >
             inbox
+            {hasNewInbox ? (
+              <span className="absolute -top-1 -right-2 h-2 w-2 rounded-full bg-red-500 ring-1 ring-white" />
+            ) : null}
           </button>
           <button
             onClick={() => router.push("/friends")}
