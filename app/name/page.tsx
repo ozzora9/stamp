@@ -96,9 +96,6 @@ export default function NamePage() {
 
         <form onSubmit={handleSubmit} className="space-y-8">
           <div className="text-left">
-            <label className="block text-xs font-bold uppercase tracking-widest text-gray-600 mb-2">
-              닉네임
-            </label>
             <input
               type="text"
               value={name}
